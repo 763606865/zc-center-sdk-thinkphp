@@ -1,0 +1,207 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ZcCenter\ThinkPHP;
+
+use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\GuzzleException;
+use JsonException;
+use Psr\Http\Message\ResponseInterface;
+use Throwable;
+use ZcCenter\ThinkPHP\Api\AbstractApi;
+use ZcCenter\ThinkPHP\Api\Auth;
+use ZcCenter\ThinkPHP\Api\Ping;
+use ZcCenter\ThinkPHP\Api\User;
+use ZcCenter\ThinkPHP\Exception\ApiException;
+use ZcCenter\ThinkPHP\Exception\SapiException;
+use ZcCenter\ThinkPHP\Exception\SignatureException;
+use ZcCenter\ThinkPHP\Exception\TransportException;
+
+final class Client
+{
+    private readonly string $baseUrl;
+    private readonly string $appKey;
+    private readonly string $appSecret;
+    private readonly bool $encryption;
+    private readonly ClientInterface $http;
+    private readonly Crypto $crypto;
+    /** @var array<class-string<AbstractApi>, AbstractApi> */
+    private array $apis = [];
+
+    public function __construct(array $config, ?ClientInterface $http = null, ?Crypto $crypto = null)
+    {
+        $this->baseUrl = rtrim(trim((string) ($config['base_url'] ?? '')), '/');
+        $this->appKey = trim((string) ($config['app_key'] ?? ''));
+        $this->appSecret = (string) ($config['app_secret'] ?? '');
+        $this->encryption = (bool) ($config['encryption'] ?? true);
+
+        if ($this->baseUrl === '' || !filter_var($this->baseUrl, FILTER_VALIDATE_URL)) {
+            throw new SapiException('ZC Center SDK的base_url配置无效');
+        }
+        if ($this->appKey === '' || $this->appSecret === '') {
+            throw new SapiException('ZC Center SDK的app_key或app_secret未配置');
+        }
+
+        $this->http = $http ?? new HttpClient([
+            'timeout' => (float) ($config['timeout'] ?? 10),
+            'connect_timeout' => (float) ($config['connect_timeout'] ?? 3),
+            'verify' => (bool) ($config['verify_ssl'] ?? true),
+            'http_errors' => false,
+        ]);
+        $this->crypto = $crypto ?? new Crypto();
+    }
+
+    public function ping(): Ping
+    {
+        /** @var Ping */
+        return $this->api(Ping::class);
+    }
+
+    public function auth(): Auth
+    {
+        /** @var Auth */
+        return $this->api(Auth::class);
+    }
+
+    public function user(): User
+    {
+        /** @var User */
+        return $this->api(User::class);
+    }
+
+    /**
+     * 获取生态产品自定义的接口集合。
+     *
+     * @template T of AbstractApi
+     * @param class-string<T> $apiClass
+     * @return T
+     */
+    public function api(string $apiClass): AbstractApi
+    {
+        if (!is_a($apiClass, AbstractApi::class, true)) {
+            throw new SapiException("自定义接口类必须继承" . AbstractApi::class);
+        }
+
+        return $this->apis[$apiClass] ??= new $apiClass($this);
+    }
+
+    public function get(string $path, array $query = []): Response
+    {
+        return $this->request('GET', $path, [], $query);
+    }
+
+    public function post(string $path, array $payload = [], array $query = []): Response
+    {
+        return $this->request('POST', $path, $payload, $query);
+    }
+
+    public function request(string $method, string $path, array $payload = [], array $query = []): Response
+    {
+        $path = '/' . ltrim($path, '/');
+        if (!str_starts_with($path, '/sapi/')) {
+            throw new SapiException('SAPI请求路径必须以/sapi/开头');
+        }
+
+        $timestamp = (string) time();
+        $nonce = $this->crypto->nonce();
+        $aad = $this->crypto->aad($this->appKey, $timestamp, $nonce);
+
+        try {
+            $body = $this->crypto->jsonEncode(
+                $this->encryption ? $this->crypto->encrypt($payload, $this->appSecret, $aad) : $payload
+            );
+        } catch (JsonException $exception) {
+            throw new SapiException('SAPI请求JSON编码失败', 0, $exception);
+        }
+
+        $canonical = $this->crypto->canonicalRequest($method, $path, $query, $timestamp, $nonce, $body);
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+            'X-App-Key' => $this->appKey,
+            'X-Timestamp' => $timestamp,
+            'X-Nonce' => $nonce,
+            'X-Signature' => $this->crypto->sign($canonical, $this->appSecret),
+            'X-Encrypted' => $this->encryption ? '1' : '0',
+        ];
+
+        try {
+            $httpResponse = $this->http->request($method, $this->baseUrl . $path, [
+                'headers' => $headers,
+                'query' => $query,
+                'body' => $body,
+                'http_errors' => false,
+            ]);
+        } catch (GuzzleException $exception) {
+            throw new TransportException('SAPI网络请求失败：' . $exception->getMessage(), 0, $exception);
+        }
+
+        return $this->parseResponse($httpResponse, $timestamp, $nonce, $aad);
+    }
+
+    private function parseResponse(
+        ResponseInterface $response,
+        string $timestamp,
+        string $nonce,
+        string $aad
+    ): Response {
+        $rawBody = (string) $response->getBody();
+        $statusCode = $response->getStatusCode();
+        $signature = trim($response->getHeaderLine('X-Response-Signature'));
+        $encrypted = $response->getHeaderLine('X-Encrypted') === '1';
+
+        try {
+            $decoded = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new TransportException('SAPI响应不是有效JSON', 0, $exception);
+        }
+        if (!is_array($decoded)) {
+            throw new TransportException('SAPI响应必须是JSON对象');
+        }
+
+        if ($signature === '') {
+            if ($statusCode >= 400) {
+                throw $this->apiException($decoded, $statusCode, false);
+            }
+            throw new SignatureException('SAPI响应缺少X-Response-Signature');
+        }
+
+        if ($encrypted) {
+            if (!$this->crypto->verifyEncryptedResponse($decoded, $signature, $timestamp, $nonce, $this->appSecret)) {
+                throw new SignatureException('SAPI加密响应签名验证失败');
+            }
+            try {
+                $payload = $this->crypto->decrypt($decoded, $this->appSecret, $aad);
+            } catch (Throwable $exception) {
+                if ($exception instanceof SapiException) {
+                    throw $exception;
+                }
+                throw new SapiException('SAPI响应解密失败', 0, $exception);
+            }
+        } else {
+            if (!$this->crypto->verifyPlaintextResponse($rawBody, $signature, $timestamp, $nonce, $this->appSecret)) {
+                throw new SignatureException('SAPI明文响应签名验证失败');
+            }
+            $payload = $decoded;
+        }
+
+        if ($statusCode >= 400 || (int) ($payload['code'] ?? 0) !== 0) {
+            throw $this->apiException($payload, $statusCode, true);
+        }
+
+        return new Response($statusCode, $payload, $response->getHeaders(), $rawBody);
+    }
+
+    private function apiException(array $payload, int $httpStatus, bool $signatureVerified): ApiException
+    {
+        return new ApiException(
+            (string) ($payload['msg'] ?? 'SAPI接口调用失败'),
+            (int) ($payload['code'] ?? 0),
+            $httpStatus,
+            is_array($payload['data'] ?? null) ? $payload['data'] : null,
+            $signatureVerified
+        );
+    }
+}

@@ -13,6 +13,8 @@ use Throwable;
 use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
 use ZcCenter\ThinkPHP\Api\Ping;
+use ZcCenter\ThinkPHP\Api\Question;
+use ZcCenter\ThinkPHP\Api\QuestionBank;
 use ZcCenter\ThinkPHP\Api\User;
 use ZcCenter\ThinkPHP\Exception\ApiException;
 use ZcCenter\ThinkPHP\Exception\SapiException;
@@ -25,8 +27,11 @@ final class Client
     private readonly string $appKey;
     private readonly string $appSecret;
     private readonly bool $encryption;
+    private readonly bool $debug;
     private readonly ClientInterface $http;
     private readonly Crypto $crypto;
+    /** @var (callable(string, array<string,mixed>): void)|null */
+    private $logger;
     /** @var array<class-string<AbstractApi>, AbstractApi> */
     private array $apis = [];
 
@@ -36,6 +41,8 @@ final class Client
         $this->appKey = trim((string) ($config['app_key'] ?? ''));
         $this->appSecret = (string) ($config['app_secret'] ?? '');
         $this->encryption = (bool) ($config['encryption'] ?? true);
+        $this->debug = (bool) ($config['debug'] ?? false);
+        $this->logger = $this->resolveLogger($config['logger'] ?? null);
 
         if ($this->baseUrl === '' || !filter_var($this->baseUrl, FILTER_VALIDATE_URL)) {
             throw new SapiException('ZC Center SDK的base_url配置无效');
@@ -69,6 +76,18 @@ final class Client
     {
         /** @var User */
         return $this->api(User::class);
+    }
+
+    public function question(): Question
+    {
+        /** @var Question */
+        return $this->api(Question::class);
+    }
+
+    public function questionBank(): QuestionBank
+    {
+        /** @var QuestionBank */
+        return $this->api(QuestionBank::class);
     }
 
     /**
@@ -127,14 +146,29 @@ final class Client
             'X-Encrypted' => $this->encryption ? '1' : '0',
         ];
 
+        $url = $this->baseUrl . $path;
+        $this->writeLog('SAPI request', [
+            'method' => strtoupper($method),
+            'url' => $url,
+            'query' => $query,
+            'request_headers' => $headers,
+            'request_params' => $payload,
+            'request_body' => $this->decodeJsonOrRaw($body),
+        ]);
+
         try {
-            $httpResponse = $this->http->request($method, $this->baseUrl . $path, [
+            $httpResponse = $this->http->request($method, $url, [
                 'headers' => $headers,
                 'query' => $query,
                 'body' => $body,
                 'http_errors' => false,
             ]);
         } catch (GuzzleException $exception) {
+            $this->writeLog('SAPI request transport error', [
+                'method' => strtoupper($method),
+                'url' => $url,
+                'error' => $exception->getMessage(),
+            ]);
             throw new TransportException('SAPI网络请求失败：' . $exception->getMessage(), 0, $exception);
         }
 
@@ -149,8 +183,15 @@ final class Client
     ): Response {
         $rawBody = (string) $response->getBody();
         $statusCode = $response->getStatusCode();
+        $responseHeaders = $this->normalizeHeaders($response->getHeaders());
         $signature = trim($response->getHeaderLine('X-Response-Signature'));
         $encrypted = $response->getHeaderLine('X-Encrypted') === '1';
+
+        $this->writeLog('SAPI response', [
+            'http_status' => $statusCode,
+            'response_headers' => $responseHeaders,
+            'response_body' => $this->decodeJsonOrRaw($rawBody),
+        ]);
 
         try {
             $decoded = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
@@ -187,6 +228,11 @@ final class Client
             $payload = $decoded;
         }
 
+        $this->writeLog('SAPI response payload', [
+            'http_status' => $statusCode,
+            'response_payload' => $payload,
+        ]);
+
         if ($statusCode >= 400 || (int) ($payload['code'] ?? 0) !== 0) {
             throw $this->apiException($payload, $statusCode, true);
         }
@@ -203,5 +249,62 @@ final class Client
             is_array($payload['data'] ?? null) ? $payload['data'] : null,
             $signatureVerified
         );
+    }
+
+    /**
+     * @param mixed $logger
+     * @return (callable(string, array<string,mixed>): void)|null
+     */
+    private function resolveLogger(mixed $logger): mixed
+    {
+        if (is_callable($logger)) {
+            return $logger;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     */
+    private function writeLog(string $message, array $context = []): void
+    {
+        if (!$this->debug) {
+            return;
+        }
+
+        if ($this->logger !== null) {
+            ($this->logger)($message, $context);
+            return;
+        }
+
+        $encoded = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        error_log('[ZcCenter SDK] ' . $message . ' ' . ($encoded === false ? '{}' : $encoded));
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     * @return array<string, string|list<string>>
+     */
+    private function normalizeHeaders(array $headers): array
+    {
+        $normalized = [];
+        foreach ($headers as $name => $values) {
+            $normalized[$name] = count($values) === 1 ? $values[0] : $values;
+        }
+
+        return $normalized;
+    }
+
+    private function decodeJsonOrRaw(string $raw): mixed
+    {
+        if ($raw === '') {
+            return '';
+        }
+        try {
+            return json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return $raw;
+        }
     }
 }

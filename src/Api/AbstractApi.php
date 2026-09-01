@@ -20,12 +20,12 @@ abstract class AbstractApi
 
     protected function post(string $path, array $payload = [], array $query = []): Response
     {
-        return $this->client->post($path, $payload, $query);
+        return $this->client->post($path, $this->compact($payload), $query);
     }
 
     protected function get(string $path, array $query = []): Response
     {
-        return $this->client->get($path, $query);
+        return $this->client->get($path, $this->compact($query));
     }
 
     protected function request(
@@ -34,6 +34,26 @@ abstract class AbstractApi
         array $payload = [],
         array $query = []
     ): Response {
-        return $this->client->request($method, $path, $payload, $query);
+        return $this->client->request($method, $path, $this->compact($payload), $this->compact($query));
+    }
+
+    /**
+     * 去掉 null，避免把未使用的可选参数带进请求体。
+     * 保留 false / 0 / [] / ''（空字符串由调用方自行决定是否传入）。
+     *
+     * @param array<string,mixed> $params
+     * @return array<string,mixed>
+     */
+    protected function compact(array $params): array
+    {
+        $out = [];
+        foreach ($params as $key => $value) {
+            if ($value === null) {
+                continue;
+            }
+            $out[$key] = $value;
+        }
+
+        return $out;
     }
 }

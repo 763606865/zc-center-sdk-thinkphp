@@ -124,6 +124,8 @@ foreach ([true, false] as $encrypted) {
     check($client->ping() === $client->ping(), 'Ping接口对象未被复用');
     check($client->auth() === $client->auth(), 'Auth接口对象未被复用');
     check($client->user() === $client->user(), 'User接口对象未被复用');
+    check($client->question() === $client->question(), 'Question接口对象未被复用');
+    check($client->questionBank() === $client->questionBank(), 'QuestionBank接口对象未被复用');
     check(
         $client->auth()->issueTicket('550e8400-e29b-41d4-a716-446655440000', 'product-b')->data() === ['echo' => 'hello'],
         'Auth接口调用失败'
@@ -131,6 +133,47 @@ foreach ([true, false] as $encrypted) {
     check(
         $client->user()->register('13800138000')->data() === ['echo' => 'hello'],
         'User接口调用失败'
+    );
+    check(
+        $client->question()->list(['page' => 1])->data() === ['echo' => 'hello'],
+        'Question列表接口调用失败'
+    );
+    check(
+        $client->question()->search(['keyword' => '导数', 'page' => 1])->data() === ['echo' => 'hello'],
+        'Question搜索接口调用失败'
+    );
+    check(
+        $client->question()->detail('550e8400-e29b-41d4-a716-446655440000')->data() === ['echo' => 'hello'],
+        'Question详情接口调用失败'
+    );
+    check(
+        $client->question()->batch(['550e8400-e29b-41d4-a716-446655440000'], true)->data() === ['echo' => 'hello'],
+        'Question批量接口调用失败'
+    );
+    check(
+        $client->question()->report([
+            'bank_uuid' => '550e8400-e29b-41d4-a716-446655440000',
+            'type' => 1,
+            'stem' => '1+1=?',
+            'options' => [['key' => 'A', 'content' => '2']],
+            'answer' => 'A',
+        ])->data() === ['echo' => 'hello'],
+        'Question上报接口调用失败'
+    );
+    check(
+        $client->question()->reportBatch(
+            ['bank_code' => 'math_basic'],
+            [['type' => 3, 'stem' => '地球是圆的', 'answer' => true]]
+        )->data() === ['echo' => 'hello'],
+        'Question批量上报接口调用失败'
+    );
+    check(
+        $client->questionBank()->list(['keyword' => '数学'])->data() === ['echo' => 'hello'],
+        'QuestionBank列表接口调用失败'
+    );
+    check(
+        $client->questionBank()->detail('550e8400-e29b-41d4-a716-446655440000')->data() === ['echo' => 'hello'],
+        'QuestionBank详情接口调用失败'
     );
 
     /** @var TestProductApi $customApi */

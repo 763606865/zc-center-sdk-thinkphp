@@ -55,6 +55,7 @@ ENCRYPTION=true
 TIMEOUT=10
 CONNECT_TIMEOUT=3
 VERIFY_SSL=true
+DEBUG=false
 ```
 
 SDK 服务提供者会自动注册，并将默认配置与生态项目的 `config/zc_center.php` 合并。如需覆盖默认配置，可创建：
@@ -70,10 +71,18 @@ return [
     'timeout' => (float) env('ZC_CENTER.TIMEOUT', 10),
     'connect_timeout' => (float) env('ZC_CENTER.CONNECT_TIMEOUT', 3),
     'verify_ssl' => (bool) env('ZC_CENTER.VERIFY_SSL', true),
+    'debug' => (bool) env('ZC_CENTER.DEBUG', false),
 ];
 ```
 
 中台联调环境关闭了 `SAPI_ENCRYPTION_ENABLED` 时，生态项目必须同步设置 `ENCRYPTION=false`。生产环境双方都必须开启加密。
+
+设置 `DEBUG=true` 后，每次 SAPI 调用会写入日志（ThinkPHP 下走 `Log::info`，否则 `error_log`），内容包括：
+
+- 请求：method、url、query、request_headers、request_params（明文业务参数）、request_body（实际发送 Body，加密时为密文信封）
+- 响应：http_status、response_headers、response_body（原始 Body）、response_payload（验签解密后的业务 JSON）
+
+生产环境请保持 `DEBUG=false`，避免日志泄露业务数据与签名头。
 
 ## 使用
 
@@ -134,6 +143,127 @@ $user = $response->data()['user'];
 
 // 使用中台永久 UUID 查找或创建当前生态产品的本地用户，再签发本产品 Token。
 $uuid = $user['uuid'];
+```
+
+### 获取题目列表
+
+```php
+use ZcCenter\ThinkPHP\Api\Question;
+
+$response = $center->question()->list([
+    'page' => 1,
+    'page_size' => 20,
+    'bank_uuid' => '3aae1b52-8fca-42c6-9bd6-7bd4901ceb66', // 可选
+    'type' => Question::TYPE_SINGLE,                 // 可选：1单选 2多选 3判断 4填空 5简答
+    'difficulty' => Question::DIFFICULTY_MEDIUM,     // 可选：1易 2中 3难
+    'tag_uuids' => [],                               // 可选
+    'updated_since' => 0,                            // 可选，增量同步
+    'include_answer' => false,                       // true 时返回标准答案与解析
+]);
+
+$list = $response->data()['list'];
+$total = $response->data()['total'];
+$engine = $response->data()['engine']; // elasticsearch | mysql
+```
+
+### 搜索题目
+
+```php
+$response = $center->question()->search([
+    'keyword' => '导数',
+    'page' => 1,
+    'page_size' => 20,
+    'bank_uuid' => null, // null 会被 SDK 自动省略
+    'include_answer' => false,
+]);
+$hits = $response->data()['list'];
+```
+
+### 获取题目详情
+
+```php
+$response = $center->question()->detail(
+    uuid: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx',
+    includeAnswer: false,
+);
+$question = $response->data()['question'];
+```
+
+### 批量拉取题目
+
+```php
+$response = $center->question()->batch(
+    uuids: ['uuid-1', 'uuid-2'],
+    includeAnswer: false,
+);
+$list = $response->data()['list'];
+```
+
+### 题库列表 / 详情
+
+```php
+$banks = $center->questionBank()->list([
+    'page' => 1,
+    'page_size' => 20,
+    'keyword' => '数学',
+])->data()['list'];
+
+$bank = $center->questionBank()
+    ->detail('3aae1b52-8fca-42c6-9bd6-7bd4901ceb66')
+    ->data()['bank'];
+// $bank['question_count'] 为该库已发布题目数
+```
+
+### 上报题目（按题干去重）
+
+仅可向 **当前应用归属** 的题库上报。同一题库内规范化题干（去 HTML、压缩空白）相同则返回已有题目，不重复创建。
+
+```php
+$response = $center->question()->report([
+    'bank_uuid' => $bankUuid, // 或 bank_code
+    'type' => Question::TYPE_SINGLE,
+    'difficulty' => Question::DIFFICULTY_MEDIUM,
+    'stem' => '1+1等于多少？',
+    'options' => [
+        ['key' => 'A', 'content' => '1'],
+        ['key' => 'B', 'content' => '2'],
+    ],
+    'answer' => 'B',
+    'analysis' => '基础运算',
+    'score' => 1,
+]);
+
+$action = $response->data()['action']; // created | exists
+$question = $response->data()['question'];
+```
+
+### 批量上报题目
+
+```php
+$response = $center->question()->reportBatch(
+    ['bank_code' => 'math_basic'],
+    [
+        [
+            'external_id' => 'local-1001',
+            'type' => Question::TYPE_JUDGE,
+            'stem' => '地球是圆的。',
+            'answer' => true,
+        ],
+        [
+            'external_id' => 'local-1002',
+            'type' => Question::TYPE_SINGLE,
+            'stem' => '1+1等于多少？',
+            'options' => [
+                ['key' => 'A', 'content' => '1'],
+                ['key' => 'B', 'content' => '2'],
+            ],
+            'answer' => 'B',
+        ],
+    ]
+);
+
+$data = $response->data();
+// created / exists / failed + results[]
 ```
 
 ## 扩展生态产品接口

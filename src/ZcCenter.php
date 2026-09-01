@@ -8,6 +8,8 @@ use think\Facade as ThinkFacade;
 use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
 use ZcCenter\ThinkPHP\Api\Ping;
+use ZcCenter\ThinkPHP\Api\Question;
+use ZcCenter\ThinkPHP\Api\QuestionBank;
 use ZcCenter\ThinkPHP\Api\User;
 
 /**
@@ -16,6 +18,8 @@ use ZcCenter\ThinkPHP\Api\User;
  * @method static Ping ping()
  * @method static Auth auth()
  * @method static User user()
+ * @method static Question question()
+ * @method static QuestionBank questionBank()
  * @method static AbstractApi api(object|string<AbstractApi> $apiClass)
  * @method static Response post(string $path, array $payload = [], array $query = [])
  * @method static Response get(string $path, array $query = [])

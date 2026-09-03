@@ -28,6 +28,9 @@ final class Client
     private readonly string $appSecret;
     private readonly bool $encryption;
     private readonly bool $debug;
+    private readonly bool $reportEnabled;
+    private readonly string $reportBankUuid;
+    private readonly string $reportBankCode;
     private readonly ClientInterface $http;
     private readonly Crypto $crypto;
     /** @var (callable(string, array<string,mixed>): void)|null */
@@ -42,6 +45,9 @@ final class Client
         $this->appSecret = (string) ($config['app_secret'] ?? '');
         $this->encryption = (bool) ($config['encryption'] ?? true);
         $this->debug = (bool) ($config['debug'] ?? false);
+        $this->reportEnabled = (bool) ($config['report_enabled'] ?? false);
+        $this->reportBankUuid = strtolower(trim((string) ($config['report_bank_uuid'] ?? '')));
+        $this->reportBankCode = trim((string) ($config['report_bank_code'] ?? ''));
         $this->logger = $this->resolveLogger($config['logger'] ?? null);
 
         if ($this->baseUrl === '' || !filter_var($this->baseUrl, FILTER_VALIDATE_URL)) {
@@ -49,6 +55,9 @@ final class Client
         }
         if ($this->appKey === '' || $this->appSecret === '') {
             throw new SapiException('ZC Center SDK的app_key或app_secret未配置');
+        }
+        if ($this->reportEnabled && $this->reportBankUuid === '' && $this->reportBankCode === '') {
+            throw new SapiException('开启题目上报时必须配置 report_bank_uuid 或 report_bank_code');
         }
 
         $this->http = $http ?? new HttpClient([
@@ -58,6 +67,48 @@ final class Client
             'http_errors' => false,
         ]);
         $this->crypto = $crypto ?? new Crypto();
+    }
+
+    /**
+     * 是否开启题目上报。
+     */
+    public function isReportEnabled(): bool
+    {
+        return $this->reportEnabled;
+    }
+
+    /**
+     * 解析上报目标题库：调用方显式传入优先，否则使用配置。
+     *
+     * @param array{bank_uuid?: string|null, bank_code?: string|null} $override
+     * @return array{bank_uuid?: string, bank_code?: string}
+     */
+    public function resolveReportBank(array $override = []): array
+    {
+        if (!$this->reportEnabled) {
+            throw new SapiException('题目上报未开启，请在配置中设置 report_enabled=true');
+        }
+
+        $overrideUuid = strtolower(trim((string) ($override['bank_uuid'] ?? '')));
+        $overrideCode = trim((string) ($override['bank_code'] ?? ''));
+        $hasOverride = $overrideUuid !== '' || $overrideCode !== '';
+
+        $uuid = $hasOverride ? $overrideUuid : $this->reportBankUuid;
+        $code = $hasOverride ? $overrideCode : $this->reportBankCode;
+
+        if ($uuid === '' && $code === '') {
+            throw new SapiException('请配置或传入上报目标题库 bank_uuid / bank_code');
+        }
+
+        $bank = [];
+        if ($uuid !== '') {
+            $bank['bank_uuid'] = $uuid;
+        }
+        if ($code !== '') {
+            $bank['bank_code'] = $code;
+        }
+
+        return $bank;
     }
 
     public function ping(): Ping

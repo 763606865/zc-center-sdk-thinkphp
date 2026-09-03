@@ -9,6 +9,7 @@ use Psr\Http\Message\RequestInterface;
 use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Client;
 use ZcCenter\ThinkPHP\Crypto;
+use ZcCenter\ThinkPHP\Exception\SapiException;
 use ZcCenter\ThinkPHP\Response;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -118,9 +119,12 @@ foreach ([true, false] as $encrypted) {
         'app_key' => $appKey,
         'app_secret' => $secret,
         'encryption' => $encrypted,
+        'report_enabled' => true,
+        'report_bank_uuid' => '550e8400-e29b-41d4-a716-446655440000',
     ], $makeHttp($encrypted), $crypto);
 
     check($client->ping()->send('hello')->data() === ['echo' => 'hello'], ($encrypted ? '加密' : '明文') . '请求测试失败');
+    check($client->isReportEnabled(), 'report_enabled应为true');
     check($client->ping() === $client->ping(), 'Ping接口对象未被复用');
     check($client->auth() === $client->auth(), 'Auth接口对象未被复用');
     check($client->user() === $client->user(), 'User接口对象未被复用');
@@ -151,8 +155,15 @@ foreach ([true, false] as $encrypted) {
         'Question批量接口调用失败'
     );
     check(
+        $client->resolveReportBank() === ['bank_uuid' => '550e8400-e29b-41d4-a716-446655440000'],
+        '上报目标题库应取自配置'
+    );
+    check(
+        $client->resolveReportBank(['bank_code' => 'math_basic']) === ['bank_code' => 'math_basic'],
+        '上报目标题库应允许调用方覆盖'
+    );
+    check(
         $client->question()->report([
-            'bank_uuid' => '550e8400-e29b-41d4-a716-446655440000',
             'type' => 1,
             'stem' => '1+1=?',
             'options' => [['key' => 'A', 'content' => '2']],
@@ -162,8 +173,8 @@ foreach ([true, false] as $encrypted) {
     );
     check(
         $client->question()->reportBatch(
-            ['bank_code' => 'math_basic'],
-            [['type' => 3, 'stem' => '地球是圆的', 'answer' => true]]
+            [['type' => 3, 'stem' => '地球是圆的', 'answer' => true]],
+            ['bank_code' => 'math_basic']
         )->data() === ['echo' => 'hello'],
         'Question批量上报接口调用失败'
     );
@@ -181,6 +192,37 @@ foreach ([true, false] as $encrypted) {
     check($customApi->example()->data() === ['echo' => 'hello'], '自定义生态接口扩展测试失败');
     check($customApi->find('detail-1001')->data() === ['echo' => 'hello'], '自定义GET接口扩展测试失败');
     check($customApi === $client->api(TestProductApi::class), '自定义接口对象未被复用');
+}
+
+$disabledClient = new Client([
+    'base_url' => 'https://center.example.com',
+    'app_key' => $appKey,
+    'app_secret' => $secret,
+    'encryption' => false,
+    'report_enabled' => false,
+], $makeHttp(false), $crypto);
+check(!$disabledClient->isReportEnabled(), 'report_enabled默认关闭');
+try {
+    $disabledClient->question()->report([
+        'type' => 1,
+        'stem' => '1+1=?',
+        'answer' => 'A',
+    ]);
+    check(false, '未开启上报时应抛出异常');
+} catch (SapiException $e) {
+    check(str_contains($e->getMessage(), '题目上报未开启'), '未开启上报异常文案错误');
+}
+
+try {
+    new Client([
+        'base_url' => 'https://center.example.com',
+        'app_key' => $appKey,
+        'app_secret' => $secret,
+        'report_enabled' => true,
+    ], $makeHttp(false), $crypto);
+    check(false, '开启上报但未配置目标题库时应抛出异常');
+} catch (SapiException $e) {
+    check(str_contains($e->getMessage(), 'report_bank_uuid'), '缺少目标题库异常文案错误');
 }
 
 echo "ZC Center ThinkPHP SDK tests passed.\n";

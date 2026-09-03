@@ -9,7 +9,7 @@ use ZcCenter\ThinkPHP\Response;
 /**
  * 题库 SAPI。
  *
- * @see docs/SAPI标准接口对接说明.md 第 5 章
+ * @see docs/sapi/题库.md
  */
 class QuestionBank extends AbstractApi
 {

@@ -56,6 +56,10 @@ TIMEOUT=10
 CONNECT_TIMEOUT=3
 VERIFY_SSL=true
 DEBUG=false
+; 题目上报（可选）：开启后 report / reportBatch 才会可用；目标题库 uuid / code 二选一
+REPORT_ENABLED=false
+REPORT_BANK_UUID=
+REPORT_BANK_CODE=
 ```
 
 SDK 服务提供者会自动注册，并将默认配置与生态项目的 `config/zc_center.php` 合并。如需覆盖默认配置，可创建：
@@ -72,9 +76,13 @@ return [
     'connect_timeout' => (float) env('ZC_CENTER.CONNECT_TIMEOUT', 3),
     'verify_ssl' => (bool) env('ZC_CENTER.VERIFY_SSL', true),
     'debug' => (bool) env('ZC_CENTER.DEBUG', false),
+    'report_enabled' => (bool) env('ZC_CENTER.REPORT_ENABLED', false),
+    'report_bank_uuid' => (string) env('ZC_CENTER.REPORT_BANK_UUID', ''),
+    'report_bank_code' => (string) env('ZC_CENTER.REPORT_BANK_CODE', ''),
 ];
 ```
 
+`report_enabled=true` 时必须配置 `report_bank_uuid` 或 `report_bank_code`（二选一，也可都配；请求时 uuid 优先）。关闭上报时调用 `report` / `reportBatch` 会抛出 `SapiException`。
 中台联调环境关闭了 `SAPI_ENCRYPTION_ENABLED` 时，生态项目必须同步设置 `ENCRYPTION=false`。生产环境双方都必须开启加密。
 
 设置 `DEBUG=true` 后，每次 SAPI 调用会写入日志（ThinkPHP 下走 `Log::info`，否则 `error_log`），内容包括：
@@ -218,9 +226,15 @@ $bank = $center->questionBank()
 
 仅可向 **当前应用归属** 的题库上报。同一题库内规范化题干（去 HTML、压缩空白）相同则返回已有题目，不重复创建。
 
+需先开启 `report_enabled`，并配置目标题库。默认使用配置中的题库；也可在调用时传入 `bank_uuid` / `bank_code` 覆盖。
+
 ```php
+// 推荐：题库写在配置里，业务代码只传题目字段
+if (!$center->isReportEnabled()) {
+    // 未开启上报，跳过同步
+}
+
 $response = $center->question()->report([
-    'bank_uuid' => $bankUuid, // 或 bank_code
     'type' => Question::TYPE_SINGLE,
     'difficulty' => Question::DIFFICULTY_MEDIUM,
     'stem' => '1+1等于多少？',
@@ -240,32 +254,29 @@ $question = $response->data()['question'];
 ### 批量上报题目
 
 ```php
-$response = $center->question()->reportBatch(
-    ['bank_code' => 'math_basic'],
+$response = $center->question()->reportBatch([
     [
-        [
-            'external_id' => 'local-1001',
-            'type' => Question::TYPE_JUDGE,
-            'stem' => '地球是圆的。',
-            'answer' => true,
+        'external_id' => 'local-1001',
+        'type' => Question::TYPE_JUDGE,
+        'stem' => '地球是圆的。',
+        'answer' => true,
+    ],
+    [
+        'external_id' => 'local-1002',
+        'type' => Question::TYPE_SINGLE,
+        'stem' => '1+1等于多少？',
+        'options' => [
+            ['key' => 'A', 'content' => '1'],
+            ['key' => 'B', 'content' => '2'],
         ],
-        [
-            'external_id' => 'local-1002',
-            'type' => Question::TYPE_SINGLE,
-            'stem' => '1+1等于多少？',
-            'options' => [
-                ['key' => 'A', 'content' => '1'],
-                ['key' => 'B', 'content' => '2'],
-            ],
-            'answer' => 'B',
-        ],
-    ]
-);
+        'answer' => 'B',
+    ],
+]);
+// 如需临时覆盖目标题库：->reportBatch($items, ['bank_code' => 'math_basic'])
 
 $data = $response->data();
 // created / exists / failed + results[]
 ```
-
 ## 扩展生态产品接口
 
 底层 `Client` 只负责签名、加密、请求和响应验证，标准接口集中在 `Api\Sapi`。不同生态产品可以定义自己的接口集合，不需要修改 SDK 核心：

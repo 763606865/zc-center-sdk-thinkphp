@@ -20,6 +20,8 @@ use ZcCenter\ThinkPHP\Api\User;
  * @method static User user()
  * @method static Question question()
  * @method static QuestionBank questionBank()
+ * @method static bool isReportEnabled()
+ * @method static array resolveReportBank(array $override = [])
  * @method static AbstractApi api(object|string<AbstractApi> $apiClass)
  * @method static Response post(string $path, array $payload = [], array $query = [])
  * @method static Response get(string $path, array $query = [])

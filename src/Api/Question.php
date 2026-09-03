@@ -9,7 +9,7 @@ use ZcCenter\ThinkPHP\Response;
 /**
  * 题目 SAPI。
  *
- * @see docs/SAPI标准接口对接说明.md 第 6 章
+ * @see docs/sapi/题库.md
  */
 class Question extends AbstractApi
 {
@@ -100,6 +100,9 @@ class Question extends AbstractApi
     /**
      * 向当前应用归属的题库上报题目（按规范化题干幂等去重）。
      *
+     * 依赖配置 `report_enabled`；目标题库默认取 `report_bank_uuid` / `report_bank_code`，
+     * 也可在 payload 中显式传入 `bank_uuid` / `bank_code` 覆盖。
+     *
      * POST /sapi/question/report
      *
      * @param array{
@@ -120,21 +123,30 @@ class Question extends AbstractApi
      */
     public function report(array $payload): Response
     {
-        return $this->post('/sapi/question/report', $payload);
+        $bank = $this->client->resolveReportBank([
+            'bank_uuid' => $payload['bank_uuid'] ?? null,
+            'bank_code' => $payload['bank_code'] ?? null,
+        ]);
+        unset($payload['bank_uuid'], $payload['bank_code']);
+
+        return $this->post('/sapi/question/report', array_merge($bank, $payload));
     }
 
     /**
-     * 批量上报题目到指定归属题库（单次最多 100 条，按题干去重）。
+     * 批量上报题目（单次最多 100 条，按题干去重）。
+     *
+     * 目标题库默认使用配置；`$bank` 非空时覆盖配置。
      *
      * POST /sapi/question/report-batch
      *
-     * @param array{bank_uuid?: string, bank_code?: string} $bank
      * @param list<array<string,mixed>> $items
+     * @param array{bank_uuid?: string, bank_code?: string} $bank
      */
-    public function reportBatch(array $bank, array $items): Response
+    public function reportBatch(array $items, array $bank = []): Response
     {
-        return $this->post('/sapi/question/report-batch', array_merge($bank, [
-            'items' => array_values($items),
-        ]));
+        return $this->post('/sapi/question/report-batch', array_merge(
+            $this->client->resolveReportBank($bank),
+            ['items' => array_values($items)]
+        ));
     }
 }

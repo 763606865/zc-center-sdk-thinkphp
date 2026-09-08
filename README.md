@@ -132,6 +132,30 @@ $response = $center->user()->register(
 $uuid = $response->data()['user']['uuid'];
 ```
 
+### 企业上报与职工
+
+```php
+use ZcCenter\ThinkPHP\Api\Enterprise;
+
+$reported = $center->enterprise()->report([
+    'name' => '示例科技有限公司',
+    'code' => 'example_tech',
+    'credit_code' => '91110000MA01234567',
+    'admin_mobile' => '13800138000',
+])->data();
+
+$center->enterprise()->addMember([
+    'enterprise_uuid' => $reported['enterprise']['uuid'],
+    'mobile' => '13900139000',
+    'role' => Enterprise::ROLE_MEMBER,
+]);
+
+$center->enterprise()->removeMember([
+    'enterprise_uuid' => $reported['enterprise']['uuid'],
+    'mobile' => '13900139000',
+]);
+```
+
 ### 来源应用申请 Ticket
 
 ```php

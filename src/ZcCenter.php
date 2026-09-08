@@ -7,6 +7,8 @@ namespace ZcCenter\ThinkPHP;
 use think\Facade as ThinkFacade;
 use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
+use ZcCenter\ThinkPHP\Api\Dict;
+use ZcCenter\ThinkPHP\Api\Enterprise;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
@@ -18,6 +20,8 @@ use ZcCenter\ThinkPHP\Api\User;
  * @method static Ping ping()
  * @method static Auth auth()
  * @method static User user()
+ * @method static Enterprise enterprise()
+ * @method static Dict dict()
  * @method static Question question()
  * @method static QuestionBank questionBank()
  * @method static bool isReportEnabled()

@@ -12,6 +12,8 @@ use Psr\Http\Message\ResponseInterface;
 use Throwable;
 use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
+use ZcCenter\ThinkPHP\Api\Dict;
+use ZcCenter\ThinkPHP\Api\Enterprise;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
@@ -127,6 +129,18 @@ final class Client
     {
         /** @var User */
         return $this->api(User::class);
+    }
+
+    public function enterprise(): Enterprise
+    {
+        /** @var Enterprise */
+        return $this->api(Enterprise::class);
+    }
+
+    public function dict(): Dict
+    {
+        /** @var Dict */
+        return $this->api(Dict::class);
     }
 
     public function question(): Question

@@ -198,6 +198,19 @@ $total = $response->data()['total'];
 $engine = $response->data()['engine']; // elasticsearch | mysql
 ```
 
+### 招考公告增量同步
+
+```php
+$page = $center->examNotice()->list(['last_uuid' => '', 'limit' => 100])->data();
+$nextUuid = $page['next_uuid'];
+
+$center->examNotice()->report([
+    'title' => '某市事业单位招聘公告',
+    'collect_source' => '某市人社局',
+    'official_url' => 'https://example.com/notices/1',
+]);
+```
+
 ### 搜索题目
 
 ```php

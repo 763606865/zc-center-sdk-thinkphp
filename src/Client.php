@@ -14,6 +14,7 @@ use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
 use ZcCenter\ThinkPHP\Api\Dict;
 use ZcCenter\ThinkPHP\Api\Enterprise;
+use ZcCenter\ThinkPHP\Api\ExamNotice;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
@@ -135,6 +136,12 @@ final class Client
     {
         /** @var Enterprise */
         return $this->api(Enterprise::class);
+    }
+
+    public function examNotice(): ExamNotice
+    {
+        /** @var ExamNotice */
+        return $this->api(ExamNotice::class);
     }
 
     public function dict(): Dict

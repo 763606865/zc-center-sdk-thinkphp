@@ -18,7 +18,7 @@ class QuestionBank extends AbstractApi
      *
      * POST /sapi/question-bank/list
      *
-     * @param array{page?: int, page_size?: int, keyword?: string} $params
+     * @param array{page?: int, page_size?: int, keyword?: string, last_uuid?: string} $params
      */
     public function list(array $params = []): Response
     {

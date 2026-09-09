@@ -130,6 +130,7 @@ foreach ([true, false] as $encrypted) {
     check($client->user() === $client->user(), 'User接口对象未被复用');
     check($client->question() === $client->question(), 'Question接口对象未被复用');
     check($client->questionBank() === $client->questionBank(), 'QuestionBank接口对象未被复用');
+    check($client->examNotice() === $client->examNotice(), 'ExamNotice接口对象未被复用');
     check(
         $client->auth()->issueTicket('550e8400-e29b-41d4-a716-446655440000', 'product-b')->data() === ['echo' => 'hello'],
         'Auth接口调用失败'
@@ -185,6 +186,18 @@ foreach ([true, false] as $encrypted) {
     check(
         $client->questionBank()->detail('550e8400-e29b-41d4-a716-446655440000')->data() === ['echo' => 'hello'],
         'QuestionBank详情接口调用失败'
+    );
+    check(
+        $client->examNotice()->list(['last_uuid' => '', 'limit' => 100])->data() === ['echo' => 'hello'],
+        'ExamNotice增量列表接口调用失败'
+    );
+    check(
+        $client->examNotice()->report(['title' => '公告', 'collect_source' => '来源'])->data() === ['echo' => 'hello'],
+        'ExamNotice推送接口调用失败'
+    );
+    check(
+        $client->examNotice()->reportBatch([['title' => '公告', 'collect_source' => '来源']])->data() === ['echo' => 'hello'],
+        'ExamNotice批量推送接口调用失败'
     );
 
     /** @var TestProductApi $customApi */

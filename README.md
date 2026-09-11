@@ -316,6 +316,15 @@ $data = $response->data();
 ```
 ## 扩展生态产品接口
 
+### 简历增量同步
+
+```php
+$page = $client->resume()->list(['updated_after' => 0, 'last_id' => 0, 'limit' => 100]);
+$client->resume()->update(['uuid' => $uuid, 'job_status' => 'actively_looking']);
+```
+
+完整游标和 `sections` 规则见中台 `docs/sapi/简历.md`。
+
 底层 `Client` 只负责签名、加密、请求和响应验证，标准接口集中在 `Api\Sapi`。不同生态产品可以定义自己的接口集合，不需要修改 SDK 核心：
 
 ```php

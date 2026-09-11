@@ -18,6 +18,7 @@ use ZcCenter\ThinkPHP\Api\ExamNotice;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
+use ZcCenter\ThinkPHP\Api\Resume;
 use ZcCenter\ThinkPHP\Api\User;
 use ZcCenter\ThinkPHP\Exception\ApiException;
 use ZcCenter\ThinkPHP\Exception\SapiException;
@@ -142,6 +143,12 @@ final class Client
     {
         /** @var ExamNotice */
         return $this->api(ExamNotice::class);
+    }
+
+    public function resume(): Resume
+    {
+        /** @var Resume */
+        return $this->api(Resume::class);
     }
 
     public function dict(): Dict

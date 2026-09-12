@@ -325,6 +325,24 @@ $client->resume()->update(['uuid' => $uuid, 'job_status' => 'actively_looking'])
 
 完整游标和 `sections` 规则见中台 `docs/sapi/简历.md`。
 
+### 职位库 / 职位
+
+```php
+$center->jobBank()->list(['page' => 1, 'page_size' => 20]);
+$page = $center->job()->list(['updated_after' => 0, 'last_id' => 0, 'limit' => 100]);
+$center->job()->report([
+    'bank_code' => 'default_center',
+    'company_credit_code' => '91110000MA01234567',
+    'code' => 'JD-001',
+    'title' => '后端工程师',
+    'employment_type' => 1,
+    'status' => 1,
+]);
+$center->job()->update(['uuid' => $uuid, 'status' => 2, 'remark' => '协助暂停']);
+```
+
+完整规则见中台 `docs/sapi/职位.md`。
+
 底层 `Client` 只负责签名、加密、请求和响应验证，标准接口集中在 `Api\Sapi`。不同生态产品可以定义自己的接口集合，不需要修改 SDK 核心：
 
 ```php

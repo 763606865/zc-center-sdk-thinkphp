@@ -18,6 +18,8 @@ use ZcCenter\ThinkPHP\Api\ExamNotice;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
+use ZcCenter\ThinkPHP\Api\Job;
+use ZcCenter\ThinkPHP\Api\JobBank;
 use ZcCenter\ThinkPHP\Api\Resume;
 use ZcCenter\ThinkPHP\Api\User;
 use ZcCenter\ThinkPHP\Exception\ApiException;
@@ -167,6 +169,18 @@ final class Client
     {
         /** @var QuestionBank */
         return $this->api(QuestionBank::class);
+    }
+
+    public function job(): Job
+    {
+        /** @var Job */
+        return $this->api(Job::class);
+    }
+
+    public function jobBank(): JobBank
+    {
+        /** @var JobBank */
+        return $this->api(JobBank::class);
     }
 
     /**

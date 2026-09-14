@@ -10,6 +10,7 @@ use ZcCenter\ThinkPHP\Api\Auth;
 use ZcCenter\ThinkPHP\Api\Dict;
 use ZcCenter\ThinkPHP\Api\Enterprise;
 use ZcCenter\ThinkPHP\Api\ExamNotice;
+use ZcCenter\ThinkPHP\Api\ExamPosition;
 use ZcCenter\ThinkPHP\Api\Ping;
 use ZcCenter\ThinkPHP\Api\Question;
 use ZcCenter\ThinkPHP\Api\QuestionBank;
@@ -26,6 +27,7 @@ use ZcCenter\ThinkPHP\Api\User;
  * @method static User user()
  * @method static Enterprise enterprise()
  * @method static ExamNotice examNotice()
+ * @method static ExamPosition examPosition()
  * @method static Resume resume()
  * @method static Dict dict()
  * @method static Question question()

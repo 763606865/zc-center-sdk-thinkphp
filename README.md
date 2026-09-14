@@ -198,17 +198,40 @@ $total = $response->data()['total'];
 $engine = $response->data()['engine']; // elasticsearch | mysql
 ```
 
-### 招考公告增量同步
+### 招考公告 / 岗位
+
+公告 list **不含**岗位明细，只带 `position_count`。岗位用 `examPosition()` 按 `notice_uuid` 增量拉取或分批上报（每批最多 100 条，最后一批 `syncIndex=true`）。
+
+若 `report()` / `reportBatch()` 仍内嵌 `positions`，SDK 会自动拆出并分批走岗位接口；数万岗位请自己循环 `examPosition()->reportBatch()`，不要塞进公告 JSON。
 
 ```php
-$page = $center->examNotice()->list(['last_uuid' => '', 'limit' => 100])->data();
+$page = $center->examNotice()->list([
+    'last_uuid' => '',
+    'limit' => 100,
+    'exam_year' => 2026,
+    'recruit_count_min' => 100,
+])->data();
 $nextUuid = $page['next_uuid'];
 
-$center->examNotice()->report([
-    'title' => '某市事业单位招聘公告',
-    'collect_source' => '某市人社局',
+$reported = $center->examNotice()->report([
+    'title' => '某省公务员考试录用公告',
+    'collect_source' => '某省公务员局',
+    'exam_year' => 2026,
+    'recruit_count' => 50000,
     'official_url' => 'https://example.com/notices/1',
-]);
+])->data();
+$noticeUuid = $reported['notice']['uuid'];
+
+$center->examPosition()->reportBatch($noticeUuid, [
+    ['name' => '综合管理岗', 'code' => '119919101', 'recruit_count' => 1],
+], true);
+
+$positions = $center->examPosition()->list([
+    'notice_uuid' => $noticeUuid,
+    'updated_after' => 0,
+    'last_id' => 0,
+    'limit' => 100,
+])->data();
 ```
 
 ### 搜索题目

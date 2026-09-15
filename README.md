@@ -144,6 +144,10 @@ $reported = $center->enterprise()->report([
     'admin_mobile' => '13800138000',
 ])->data();
 
+$enterprise = $center->enterprise()->detail([
+    'credit_code' => '91110000MA01234567',
+])->data()['enterprise'];
+
 $center->enterprise()->addMember([
     'enterprise_uuid' => $reported['enterprise']['uuid'],
     'mobile' => '13900139000',
@@ -155,6 +159,25 @@ $center->enterprise()->removeMember([
     'mobile' => '13900139000',
 ]);
 ```
+
+### 组织上报与详情
+
+```php
+use ZcCenter\ThinkPHP\Api\Organization;
+
+$reported = $center->organization()->report([
+    'external_id' => 'school-10001',
+    'name' => '示例职业技术学校',
+    'primary_type' => Organization::TYPE_SCHOOL,
+    'area_code' => '110101',
+])->data();
+
+$organization = $center->organization()->detail([
+    'organization_uuid' => $reported['organization']['uuid'],
+])->data()['organization'];
+```
+
+首次使用 `external_id` 幂等上报，之后也可用返回的 `organization_uuid` 更新。企业无需先调组织接口，`enterprise()->report()` 会自动创建或更新组织主体。
 
 ### 来源应用申请 Ticket
 

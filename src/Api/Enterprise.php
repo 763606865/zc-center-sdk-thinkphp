@@ -28,6 +28,12 @@ class Enterprise extends AbstractApi
         return $this->post('/sapi/enterprise/report', $payload);
     }
 
+    /** 按 enterprise_uuid、credit_code 或 enterprise_code 获取详情。 */
+    public function detail(array $payload): Response
+    {
+        return $this->post('/sapi/enterprise/detail', $payload);
+    }
+
     /**
      * 加入职工。
      *

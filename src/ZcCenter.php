@@ -9,6 +9,7 @@ use ZcCenter\ThinkPHP\Api\AbstractApi;
 use ZcCenter\ThinkPHP\Api\Auth;
 use ZcCenter\ThinkPHP\Api\Dict;
 use ZcCenter\ThinkPHP\Api\Enterprise;
+use ZcCenter\ThinkPHP\Api\Organization;
 use ZcCenter\ThinkPHP\Api\ExamNotice;
 use ZcCenter\ThinkPHP\Api\ExamPosition;
 use ZcCenter\ThinkPHP\Api\Ping;
@@ -26,6 +27,7 @@ use ZcCenter\ThinkPHP\Api\User;
  * @method static Auth auth()
  * @method static User user()
  * @method static Enterprise enterprise()
+ * @method static Organization organization()
  * @method static ExamNotice examNotice()
  * @method static ExamPosition examPosition()
  * @method static Resume resume()

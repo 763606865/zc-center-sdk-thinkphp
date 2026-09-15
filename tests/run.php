@@ -128,6 +128,8 @@ foreach ([true, false] as $encrypted) {
     check($client->ping() === $client->ping(), 'Ping接口对象未被复用');
     check($client->auth() === $client->auth(), 'Auth接口对象未被复用');
     check($client->user() === $client->user(), 'User接口对象未被复用');
+    check($client->enterprise() === $client->enterprise(), 'Enterprise接口对象未被复用');
+    check($client->organization() === $client->organization(), 'Organization接口对象未被复用');
     check($client->question() === $client->question(), 'Question接口对象未被复用');
     check($client->questionBank() === $client->questionBank(), 'QuestionBank接口对象未被复用');
     check($client->examNotice() === $client->examNotice(), 'ExamNotice接口对象未被复用');
@@ -140,6 +142,9 @@ foreach ([true, false] as $encrypted) {
         $client->user()->register('13800138000')->data() === ['echo' => 'hello'],
         'User接口调用失败'
     );
+    check($client->organization()->report(['external_id' => 'school-1', 'name' => '示例学校', 'primary_type' => 'school'])->data() === ['echo' => 'hello'], 'Organization上报接口调用失败');
+    check($client->organization()->detail(['external_id' => 'school-1'])->data() === ['echo' => 'hello'], 'Organization详情接口调用失败');
+    check($client->enterprise()->detail(['credit_code' => '91110000MA01234567'])->data() === ['echo' => 'hello'], 'Enterprise详情接口调用失败');
     check(
         $client->question()->list(['page' => 1])->data() === ['echo' => 'hello'],
         'Question列表接口调用失败'
